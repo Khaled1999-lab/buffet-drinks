@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Buffet</title>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey:            "AIzaSyBBntwdW-1ZhrEqbvFNGT_HzogvcEXSkhM",
+    authDomain:        "buffet-drinks-8732b.firebaseapp.com",
+    databaseURL:       "https://buffet-drinks-8732b-default-rtdb.firebaseio.com",
+    projectId:         "buffet-drinks-8732b",
+    storageBucket:     "buffet-drinks-8732b.firebasestorage.app",
+    messagingSenderId: "1056126008410",
+    appId:             "1:1056126008410:web:5a65b4309ff2641f05ac63"
+  };
+
+  const ADMIN_PASSWORD = "khaled";
+
+  const app = firebase.initializeApp(firebaseConfig);
+  const db  = firebase.database();
+
+  window._fb = {
+    db,
+    ref:     (db, path) => firebase.database().ref(path),
+    set:     (ref, val) => ref.set(val),
+    push:    (ref, val) => ref.push(val),
+    onValue: (ref, cb)  => { ref.on('value', snap => cb(snap)); },
+    update:  (ref, val) => ref.update(val),
+    remove:  (ref)      => ref.remove()
+  };
+  window.ADMIN_PASSWORD = ADMIN_PASSWORD;
+  window._fbReady = true;
+  window.dispatchEvent(new Event('fb-ready'));
+</script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap');
+
+:root {
+  --bg:#F7F5F2; --surface:#FFF; --surface2:#F0EDE8; --border:#E4DFD8;
+  --ink:#1C1917; --ink2:#6B6560; --ink3:#A09990;
+  --accent:#C17A3A; --accent-light:#F5EAD9; --accent-dark:#9E5E22;
+  --green:#3A7A5A; --green-light:#D9F0E5; --red:#B54040; --red-light:#F5DADA;
+  --blue:#3A5A7A; --blue-light:#D9E8F0;
+  --radius:16px; --radius-sm:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;max-width:430px;margin:0 auto;}
+
+/* NAV */
+.nav{position:sticky;top:0;z-index:100;background:var(--surface);border-bottom:1px solid var(--border);padding:10px 14px;}
+.nav-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.nav-logo{font-family:'DM Serif Display',serif;font-size:20px;color:var(--accent);user-select:none;}
+.cart-btn{position:relative;border:none;background:var(--accent-light);color:var(--accent);border-radius:20px;padding:7px 14px 7px 12px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .2s;}
+.cart-btn:hover{background:var(--accent);color:#fff;}
+.cart-badge{position:absolute;top:-5px;right:-5px;background:var(--red);color:#fff;font-size:10px;font-weight:700;width:18px;height:18px;border-radius:50%;display:none;align-items:center;justify-content:center;}
+.cart-badge.show{display:flex;}
+
+/* BOTTOM TAB BAR */
+.tab-bar{display:flex;gap:2px;}
+.tab-btn{flex:1;border:none;background:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;color:var(--ink2);padding:7px 4px;border-radius:10px;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:2px;}
+.tab-btn .tab-icon{font-size:18px;}
+.tab-btn.active{background:var(--accent-light);color:var(--accent-dark);font-weight:600;}
+#adminTabBtn{display:none;}
+
+/* SCREENS */
+.screen{display:none;padding:18px;padding-bottom:30px;}.screen.active{display:block;}
+.screen-title{font-family:'DM Serif Display',serif;font-size:26px;margin-bottom:4px;}
+.screen-sub{font-size:13px;color:var(--ink2);margin-bottom:20px;}
+.empty-state{text-align:center;padding:50px 20px;color:var(--ink3);font-size:14px;line-height:1.6;}
+.empty-state .icon{font-size:40px;margin-bottom:12px;}
+
+/* DRINK CARD */
+.drink-card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);margin-bottom:12px;overflow:hidden;}
+.drink-card-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;}
+.drink-card-left{display:flex;align-items:center;gap:12px;}
+.drink-emoji{font-size:26px;width:44px;height:44px;background:var(--accent-light);border-radius:12px;display:flex;align-items:center;justify-content:center;}
+.drink-name{font-size:16px;font-weight:600;}
+.drink-desc{font-size:12px;color:var(--ink2);margin-top:2px;}
+.drink-expand{color:var(--ink3);font-size:18px;transition:transform .2s;}
+.drink-expand.open{transform:rotate(180deg);}
+.drink-options{display:none;padding:0 16px 16px;border-top:1px solid var(--border);}
+.drink-options.open{display:block;}
+.drink-options-inner{padding-top:14px;display:flex;flex-direction:column;gap:14px;}
+
+/* STEPPERS & CHIPS */
+.option-row{display:flex;flex-direction:column;gap:6px;}
+.option-label{font-size:12px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;}
+.stepper{display:flex;align-items:center;gap:10px;}
+.stepper-btn{width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border);background:var(--surface2);cursor:pointer;font-size:18px;color:var(--ink);display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.stepper-btn:hover{border-color:var(--accent);color:var(--accent);}
+.stepper-val{font-size:15px;font-weight:600;min-width:28px;text-align:center;}
+.stepper-unit{font-size:12px;color:var(--ink3);}
+.option-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.chip{padding:5px 12px;border-radius:20px;font-size:13px;border:1.5px solid var(--border);background:var(--surface2);cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif;color:var(--ink);}
+.chip.selected{border-color:var(--accent);background:var(--accent-light);color:var(--accent-dark);font-weight:600;}
+.option-notes input{width:100%;padding:9px 12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);font-family:'DM Sans',sans-serif;font-size:14px;background:var(--surface2);color:var(--ink);outline:none;}
+.option-notes input:focus{border-color:var(--accent);}
+.add-to-order-btn{margin-top:6px;width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;transition:background .2s;}
+.add-to-order-btn:hover{background:var(--accent-dark);}
+
+/* HOUSEKEEPING CARD */
+.hk-card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;}
+.hk-card-left{display:flex;align-items:center;gap:12px;}
+.hk-emoji{font-size:26px;width:44px;height:44px;background:var(--blue-light);border-radius:12px;display:flex;align-items:center;justify-content:center;}
+.hk-name{font-size:16px;font-weight:600;}
+.hk-desc{font-size:12px;color:var(--ink2);margin-top:2px;}
+.hk-btn{padding:8px 16px;background:var(--blue-light);color:var(--blue);border:none;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.hk-btn:hover{background:var(--blue);color:#fff;}
+
+/* ORDER */
+.name-input-wrap{margin-bottom:18px;}
+.name-input-wrap label{font-size:12px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px;}
+.name-input-wrap input{width:100%;padding:11px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--border);font-family:'DM Sans',sans-serif;font-size:15px;background:var(--surface);color:var(--ink);outline:none;}
+.name-input-wrap input:focus{border-color:var(--accent);}
+.order-item{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:flex-start;}
+.order-item-name{font-size:15px;font-weight:600;}
+.order-item-details{font-size:12px;color:var(--ink2);margin-top:4px;line-height:1.5;}
+.remove-btn{background:var(--red-light);border:none;color:var(--red);border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:16px;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.submit-order-btn{width:100%;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;cursor:pointer;margin-top:10px;transition:background .2s;}
+.submit-order-btn:hover{background:var(--accent-dark);}
+.submit-order-btn:disabled{background:var(--ink3);cursor:not-allowed;}
+
+/* QUEUE */
+.queue-item{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:14px 16px;margin-bottom:10px;}
+.queue-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:8px;}
+.queue-name{font-size:15px;font-weight:600;}
+.queue-time{font-size:12px;color:var(--ink3);white-space:nowrap;}
+.queue-drinks{font-size:13px;color:var(--ink2);line-height:1.6;}
+.queue-footer{display:flex;justify-content:space-between;align-items:center;margin-top:10px;}
+.status-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;}
+.status-badge.pending{background:#FEF3C7;color:#92400E;}
+.status-badge.ready{background:var(--green-light);color:var(--green);}
+.status-badge.done{background:var(--surface2);color:var(--ink3);}
+.status-badge.hk{background:var(--blue-light);color:var(--blue);}
+.queue-remove-btn{background:none;border:none;color:var(--ink3);font-size:13px;cursor:pointer;padding:2px 6px;border-radius:6px;}
+.queue-remove-btn:hover{background:var(--red-light);color:var(--red);}
+
+/* ADMIN */
+.admin-section{margin-bottom:24px;}
+.admin-section-title{font-size:12px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;}
+.add-drink-form{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:16px;margin-bottom:16px;}
+.form-row{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;}
+.form-row label{font-size:12px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;}
+.form-row input,.form-row textarea,.form-row select{width:100%;padding:9px 12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);font-family:'DM Sans',sans-serif;font-size:14px;background:var(--surface2);color:var(--ink);outline:none;resize:none;}
+.form-row input:focus,.form-row select:focus{border-color:var(--accent);}
+.customization-builder{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}
+.custom-option-row{display:flex;gap:8px;align-items:center;background:var(--surface2);border-radius:var(--radius-sm);padding:8px 10px;}
+.custom-option-row input{flex:1;padding:6px 8px;font-size:13px;background:var(--surface);}
+.custom-option-row select{width:90px;padding:6px 8px;font-size:13px;background:var(--surface);}
+.remove-custom-btn{background:var(--red-light);border:none;color:var(--red);border-radius:6px;width:26px;height:26px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;}
+.add-custom-btn{border:1.5px dashed var(--border);background:none;border-radius:var(--radius-sm);padding:8px;font-size:13px;color:var(--ink2);cursor:pointer;width:100%;font-family:'DM Sans',sans-serif;transition:all .15s;}
+.add-custom-btn:hover{border-color:var(--accent);color:var(--accent);}
+.save-drink-btn{width:100%;padding:11px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;transition:background .2s;}
+.save-drink-btn:hover{background:var(--accent-dark);}
+.admin-drink-item{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;}
+.admin-drink-left{display:flex;align-items:center;gap:10px;}
+.admin-drink-name{font-size:15px;font-weight:600;}
+.admin-drink-opts{font-size:12px;color:var(--ink3);}
+.delete-btn{background:var(--red-light);border:none;color:var(--red);border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;}
+.queue-admin-item{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:14px 16px;margin-bottom:10px;}
+.queue-admin-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;gap:8px;}
+.queue-admin-name{font-size:15px;font-weight:600;}
+.queue-status-select{padding:4px 8px;border-radius:8px;border:1.5px solid var(--border);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;background:var(--surface2);cursor:pointer;outline:none;flex-shrink:0;}
+.queue-admin-drinks{font-size:13px;color:var(--ink2);line-height:1.6;}
+.queue-admin-remove{margin-top:8px;background:var(--red-light);border:none;color:var(--red);border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--ink);color:#fff;padding:12px 20px;border-radius:30px;font-size:14px;font-weight:500;transition:transform .3s;z-index:999;white-space:nowrap;}
+.toast.show{transform:translateX(-50%) translateY(0);}
+
+/* SUCCESS */
+.success-overlay{display:none;position:fixed;inset:0;background:rgba(247,245,242,.96);z-index:200;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px;}
+.success-overlay.show{display:flex;}
+.success-icon{font-size:64px;margin-bottom:16px;}
+.success-title{font-family:'DM Serif Display',serif;font-size:28px;margin-bottom:8px;}
+.success-sub{font-size:15px;color:var(--ink2);margin-bottom:24px;line-height:1.6;}
+.success-close-btn{padding:12px 32px;background:var(--accent);color:#fff;border:none;border-radius:30px;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;cursor:pointer;}
+
+/* DIVIDER */
+.divider{height:1px;background:var(--border);margin:16px 0;}
+
+/* EDIT MODAL */
+.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(28,25,23,.45);z-index:300;align-items:flex-end;justify-content:center;}
+.modal-backdrop.show{display:flex;}
+.modal{background:var(--surface);border-radius:24px 24px 0 0;width:100%;max-width:430px;max-height:90vh;overflow-y:auto;padding:20px 18px 36px;animation:slideUp .25s ease;}
+@keyframes slideUp{from{transform:translateY(60px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-handle{width:40px;height:4px;background:var(--border);border-radius:4px;margin:0 auto 18px;}
+.modal-title{font-family:'DM Serif Display',serif;font-size:22px;margin-bottom:16px;}
+.modal-actions{display:flex;gap:10px;margin-top:14px;}
+.modal-save-btn{flex:1;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;}
+.modal-cancel-btn{padding:12px 18px;background:var(--surface2);color:var(--ink2);border:none;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:15px;font-weight:500;cursor:pointer;}
+
+/* PASSWORD GATE */
+.pw-gate{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;padding:40px 24px;text-align:center;}
+.pw-gate h2{font-family:'DM Serif Display',serif;font-size:26px;margin-bottom:8px;}
+.pw-gate p{font-size:14px;color:var(--ink2);margin-bottom:24px;}
+.pw-input{width:100%;max-width:260px;padding:12px 16px;border-radius:var(--radius-sm);border:1.5px solid var(--border);font-family:'DM Sans',sans-serif;font-size:16px;background:var(--surface);color:var(--ink);outline:none;text-align:center;letter-spacing:3px;margin-bottom:12px;}
+.pw-btn{padding:12px 32px;background:var(--accent);color:#fff;border:none;border-radius:30px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;}
+.pw-error{font-size:13px;color:var(--red);margin-top:8px;min-height:18px;}
+
+/* LOADING */
+.loading-bar{height:3px;background:var(--accent-light);position:fixed;top:0;left:0;right:0;z-index:999;display:none;}
+.loading-bar::after{content:'';display:block;height:100%;width:40%;background:var(--accent);animation:loading 1s ease-in-out infinite;}
+@keyframes loading{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}
+</style>
+</head>
+<body>
+
+<div class="loading-bar" id="loadingBar"></div>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-top">
+    <span class="nav-logo" onclick="handleLogoTap()">☕ Buffet</span>
+    <button class="cart-btn" onclick="showScreen('order')">
+      🛒 <span id="cartCount">0</span>
+      <span class="cart-badge" id="cartBadge"></span>
+    </button>
+  </div>
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab-menu" onclick="showScreen('menu')"><span class="tab-icon">🍵</span>Drinks</button>
+    <button class="tab-btn" id="tab-housekeeping" onclick="showScreen('housekeeping')"><span class="tab-icon">🧹</span>Housekeeping</button>
+    <button class="tab-btn" id="tab-queue" onclick="showScreen('queue')"><span class="tab-icon">⏳</span>Queue</button>
+    <button class="tab-btn" id="adminTabBtn" onclick="showScreen('admin')"><span class="tab-icon">⚙️</span>Admin</button>
+  </div>
+</nav>
+
+<!-- MENU SCREEN -->
+<div class="screen active" id="screen-menu">
+  <h1 class="screen-title">What'll it be?</h1>
+  <p class="screen-sub">Pick your drink and customise it.</p>
+  <div id="drinkList"><div class="empty-state"><div class="icon">🍵</div>Loading menu…</div></div>
+</div>
+
+<!-- HOUSEKEEPING SCREEN -->
+<div class="screen" id="screen-housekeeping">
+  <h1 class="screen-title">Housekeeping</h1>
+  <p class="screen-sub">Request supplies or assistance.</p>
+  <div id="hkList"></div>
+</div>
+
+<!-- ORDER SCREEN -->
+<div class="screen" id="screen-order">
+  <h1 class="screen-title">Your Order</h1>
+  <p class="screen-sub">Review and submit to the buffet staff.</p>
+  <div class="name-input-wrap">
+    <label>Your Name</label>
+    <input type="text" id="customerName" placeholder="e.g. Sarah" />
+  </div>
+  <div id="cartList"></div>
+  <div id="cartEmpty" class="empty-state" style="padding:30px 0">
+    <div class="icon">🛒</div>Your cart is empty. Go pick a drink!
+  </div>
+  <button class="submit-order-btn" id="submitBtn" onclick="submitOrder()" disabled>Place Order</button>
+</div>
+
+<!-- QUEUE SCREEN -->
+<div class="screen" id="screen-queue">
+  <h1 class="screen-title">Live Queue</h1>
+  <p class="screen-sub">All requests — updates live.</p>
+  <div id="queueList"><div class="empty-state"><div class="icon">⏳</div>No requests yet.</div></div>
+</div>
+
+<!-- ADMIN SCREEN -->
+<div class="screen" id="screen-admin">
+  <div id="pwGate" class="pw-gate">
+    <div style="font-size:48px;margin-bottom:12px">🔒</div>
+    <h2>Admin Access</h2>
+    <p>Enter the admin password to continue.</p>
+    <input class="pw-input" type="password" id="pwInput" placeholder="••••••••"
+      onkeydown="if(event.key==='Enter')checkPassword()" />
+    <button class="pw-btn" onclick="checkPassword()">Unlock</button>
+    <div class="pw-error" id="pwError"></div>
+  </div>
+
+  <div id="adminPanel" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <h1 class="screen-title" style="margin:0">Admin</h1>
+      <button onclick="lockAdmin()" style="font-size:12px;color:var(--ink3);background:none;border:none;cursor:pointer;">🔓 Lock</button>
+    </div>
+    <p class="screen-sub">Manage drinks and incoming requests.</p>
+
+    <!-- WA Settings -->
+    <div class="admin-section">
+      <div class="admin-section-title">📱 WhatsApp Settings</div>
+      <div class="add-drink-form">
+        <div class="form-row">
+          <label>Staff WhatsApp Number</label>
+          <input type="tel" id="waNumber" placeholder="e.g. 201001234567" oninput="saveWANumber()" />
+        </div>
+        <p style="font-size:12px;color:var(--ink3);line-height:1.6">
+          Enter with country code, no + or spaces.<br>
+          🇪🇬 Egypt example: <strong>201001234567</strong><br>
+          🇬🇧 UK example: <strong>447911123456</strong>
+        </p>
+      </div>
+    </div>
+
+    <!-- Add Drink -->
+    <div class="admin-section">
+      <div class="admin-section-title">Add New Drink</div>
+      <div class="add-drink-form">
+        <div class="form-row"><label>Drink Name</label><input type="text" id="newDrinkName" placeholder="e.g. Cappuccino" /></div>
+        <div class="form-row"><label>Description</label><input type="text" id="newDrinkDesc" placeholder="e.g. Espresso with steamed milk" /></div>
+        <div class="form-row"><label>Emoji</label><input type="text" id="newDrinkEmoji" placeholder="☕" maxlength="4" style="width:70px" /></div>
+        <div style="font-size:12px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Customisation Options</div>
+        <div class="customization-builder" id="customBuilder"></div>
+        <button class="add-custom-btn" onclick="addCustomOption()">＋ Add option (Sugar, Milk type…)</button>
+        <div class="divider"></div>
+        <button class="save-drink-btn" onclick="saveDrink()">Save Drink</button>
+      </div>
+    </div>
+
+    <!-- Drink Menu -->
+    <div class="admin-section">
+      <div class="admin-section-title">Drink Menu</div>
+      <div id="adminDrinkList"><div class="empty-state" style="padding:20px 0">No drinks yet.</div></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Incoming Orders -->
+    <div class="admin-section">
+      <div class="admin-section-title">All Incoming Requests</div>
+      <div id="adminQueueList"><div class="empty-state" style="padding:20px 0">No requests yet.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-backdrop" id="editModalBackdrop" onclick="closeEditModal(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Edit Drink</div>
+    <div class="form-row"><label>Name</label><input type="text" id="editDrinkName" /></div>
+    <div class="form-row"><label>Description</label><input type="text" id="editDrinkDesc" /></div>
+    <div class="form-row"><label>Emoji</label><input type="text" id="editDrinkEmoji" maxlength="4" style="width:70px" /></div>
+    <div style="font-size:12px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Customisation Options</div>
+    <div class="customization-builder" id="editCustomBuilder"></div>
+    <button class="add-custom-btn" onclick="addEditCustomOption()">＋ Add option</button>
+    <div class="modal-actions">
+      <button class="modal-cancel-btn" onclick="closeEditModal()">Cancel</button>
+      <button class="modal-save-btn" onclick="saveEditDrink()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- SUCCESS -->
+<div class="success-overlay" id="successOverlay">
+  <div class="success-icon">✅</div>
+  <div class="success-title" id="successTitle">Request Sent!</div>
+  <div class="success-sub" id="successMsg"></div>
+  <button class="success-close-btn" onclick="closeSuccess()">View Queue →</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── STATE ──
+let drinks = {}, orders = {}, cart = [];
+let adminUnlocked = false, editingKey = null;
+let editCustomOptions = [], customOptions = [];
+
+// ── FIREBASE READY ──
+function onFbReady(fn) {
+  if (window._fbReady) fn();
+  else window.addEventListener('fb-ready', fn, { once: true });
+}
+
+onFbReady(() => {
+  const dbRef = firebase.database().ref;
+
+  firebase.database().ref('drinks').on('value', snap => {
+    drinks = snap.val() || {};
+    if (!Object.keys(drinks).length) seedDefaultDrinks();
+    else { renderMenu(); if (adminUnlocked) renderAdminDrinks(); }
+  });
+
+  firebase.database().ref('orders').on('value', snap => {
+    orders = snap.val() || {};
+    renderQueue();
+    if (adminUnlocked) renderAdminQueue();
+  });
+
+  firebase.database().ref('settings/waNumber').on('value', snap => {
+    const v = snap.val() || '';
+    const el = document.getElementById('waNumber');
+    if (el) el.value = v;
+  });
+});
+
+// ── SEED DRINKS ──
+function seedDefaultDrinks() {
+  const milk   = { label:'Milk',     type:'chips',   choices:['No Milk','Quarter','Half','Full'] };
+  const sugar  = { label:'Sugar',    type:'stepper', unit:'spoon(s)' };
+  const bag    = { label:'Strength', type:'chips',   choices:['Single Bag','Double Bag'] };
+  const defaults = [
+    { name:'Coffee',    emoji:'☕', desc:'Rich brewed coffee',        options:[sugar, milk] },
+    { name:'Tea',       emoji:'🍵', desc:'Classic black tea',         options:[sugar, milk, bag] },
+    { name:'Nescafé',   emoji:'☕', desc:'Instant coffee',            options:[sugar, milk] },
+    { name:'Ginger',    emoji:'🫚', desc:'Warm ginger drink',         options:[sugar] },
+    { name:'Mint',      emoji:'🌿', desc:'Fresh mint tea',            options:[sugar, bag] },
+    { name:'Green Tea', emoji:'🍃', desc:'Light & healthy green tea', options:[sugar, bag] },
+  ];
+  onFbReady(() => {
+    defaults.forEach(d => firebase.database().ref('drinks').push(d));
+  });
+}
+
+// ── SECRET ADMIN (tap logo 5×) ──
+let logoTaps = 0, logoTimer = null;
+function handleLogoTap() {
+  logoTaps++;
+  clearTimeout(logoTimer);
+  logoTimer = setTimeout(() => logoTaps = 0, 2000);
+  if (logoTaps >= 5) {
+    logoTaps = 0;
+    document.getElementById('adminTabBtn').style.display = 'flex';
+    showScreen('admin');
+  }
+}
+
+// ── SCREENS ──
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+  const tabEl = document.getElementById('tab-' + id);
+  if (tabEl) tabEl.classList.add('active');
+  if (id === 'order') renderCart();
+  if (id === 'housekeeping') renderHousekeeping();
+}
+
+// ── PASSWORD ──
+function checkPassword() {
+  const val = document.getElementById('pwInput').value;
+  if (val === window.ADMIN_PASSWORD) {
+    adminUnlocked = true;
+    document.getElementById('pwGate').style.display = 'none';
+    document.getElementById('adminPanel').style.display = 'block';
+    document.getElementById('adminTabBtn').style.display = 'flex';
+    renderAdminDrinks(); renderAdminQueue();
+  } else {
+    document.getElementById('pwError').textContent = 'Incorrect password.';
+    document.getElementById('pwInput').value = '';
+  }
+}
+function lockAdmin() {
+  adminUnlocked = false;
+  document.getElementById('pwGate').style.display = 'flex';
+  document.getElementById('adminPanel').style.display = 'none';
+  document.getElementById('pwInput').value = '';
+  document.getElementById('pwError').textContent = '';
+  document.getElementById('adminTabBtn').style.display = 'none';
+  showScreen('menu');
+}
+
+// ── MENU ──
+function renderMenu() {
+  const el = document.getElementById('drinkList');
+  const list = Object.entries(drinks);
+  if (!list.length) { el.innerHTML = `<div class="empty-state"><div class="icon">🍵</div>No drinks yet.<br>Check back soon!</div>`; return; }
+  el.innerHTML = list.map(([key, d], i) => `
+    <div class="drink-card" id="card-${i}">
+      <div class="drink-card-header" onclick="toggleCard(${i})">
+        <div class="drink-card-left">
+          <div class="drink-emoji">${d.emoji||'☕'}</div>
+          <div><div class="drink-name">${d.name}</div>${d.desc?`<div class="drink-desc">${d.desc}</div>`:''}</div>
+        </div>
+        <span class="drink-expand" id="expand-${i}">⌄</span>
+      </div>
+      <div class="drink-options" id="options-${i}">
+        <div class="drink-options-inner">
+          ${renderCustomOptions(d, i)}
+          <div class="option-row option-notes">
+            <div class="option-label">Extra notes</div>
+            <input type="text" placeholder="Any special requests…" id="notes-${i}" />
+          </div>
+          <button class="add-to-order-btn" onclick="addToCart('${key}',${i})">Add to order</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function renderCustomOptions(drink, di) {
+  if (!drink.options || !drink.options.length) return '';
+  return drink.options.map((opt, oi) => {
+    if (opt.type === 'stepper') return `
+      <div class="option-row">
+        <div class="option-label">${opt.label}</div>
+        <div class="stepper">
+          <button class="stepper-btn" onclick="stepperChange(${di},${oi},-1)">−</button>
+          <span class="stepper-val" id="sv-${di}-${oi}">0.5</span>
+          <button class="stepper-btn" onclick="stepperChange(${di},${oi},1)">+</button>
+          <span class="stepper-unit">${opt.unit||'spoon(s)'}</span>
+        </div>
+      </div>`;
+    if (opt.type === 'chips') return `
+      <div class="option-row">
+        <div class="option-label">${opt.label}</div>
+        <div class="option-chips">
+          ${(opt.choices||[]).map((c,ci)=>`<button class="chip${ci===0?' selected':''}" onclick="selectChip(this)">${c}</button>`).join('')}
+        </div>
+      </div>`;
+    return '';
+  }).join('');
+}
+
+function toggleCard(i) {
+  document.getElementById(`options-${i}`).classList.toggle('open');
+  document.getElementById(`expand-${i}`).classList.toggle('open');
+}
+function stepperChange(di, oi, delta) {
+  const el = document.getElementById(`sv-${di}-${oi}`);
+  let val = parseFloat(el.textContent) + delta * 0.5;
+  if (val < 0) val = 0;
+  el.textContent = val % 1 === 0 ? val.toFixed(1) : val;
+}
+function selectChip(btn) {
+  btn.parentElement.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+
+function addToCart(key, di) {
+  const drink = Object.values(drinks)[di];
+  const fixedCustomizations = [];
+  const chipGroups = document.querySelectorAll(`#options-${di} .option-chips`);
+  let chipCount = 0;
+  (drink.options||[]).forEach((opt, oi) => {
+    if (opt.type==='stepper') {
+      const val = document.getElementById(`sv-${di}-${oi}`)?.textContent;
+      fixedCustomizations.push(`${opt.label}: ${val} ${opt.unit||'spoon(s)'}`);
+    } else if (opt.type==='chips') {
+      const grp = chipGroups[chipCount++];
+      if (grp) { const sel = grp.querySelector('.chip.selected'); if (sel) fixedCustomizations.push(`${opt.label}: ${sel.textContent}`); }
+    }
+  });
+  const notes = document.getElementById(`notes-${di}`)?.value.trim();
+  if (notes) fixedCustomizations.push(`Note: ${notes}`);
+  cart.push({ drinkKey: key, name: drink.name, emoji: drink.emoji||'☕', customizations: fixedCustomizations });
+  updateCartBadge();
+  showToast(`${drink.emoji||'☕'} ${drink.name} added!`);
+  toggleCard(di);
+}
+
+function updateCartBadge() {
+  document.getElementById('cartCount').textContent = cart.length;
+  const badge = document.getElementById('cartBadge');
+  if (cart.length > 0) { badge.textContent = cart.length; badge.classList.add('show'); }
+  else badge.classList.remove('show');
+}
+
+// ── HOUSEKEEPING ──
+const hkItems = [
+  { id:'tissues',  emoji:'🧻', name:'Tissues',               desc:'Request a box of tissues' },
+  { id:'clean',    emoji:'🧹', name:'Clean Office',          desc:'Request someone to attend and clean' },
+];
+
+function renderHousekeeping() {
+  document.getElementById('hkList').innerHTML = hkItems.map(item => `
+    <div class="hk-card">
+      <div class="hk-card-left">
+        <div class="hk-emoji">${item.emoji}</div>
+        <div><div class="hk-name">${item.name}</div><div class="hk-desc">${item.desc}</div></div>
+      </div>
+      <button class="hk-btn" onclick="sendHKRequest('${item.id}','${item.emoji}','${item.name}')">Request</button>
+    </div>`).join('');
+}
+
+function sendHKRequest(id, emoji, name) {
+  const requesterName = prompt('Your name please:');
+  if (!requesterName || !requesterName.trim()) return;
+  const order = {
+    name: requesterName.trim(),
+    type: 'housekeeping',
+    items: [{ emoji, name, customizations:[] }],
+    time: new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', hour12:true }),
+    status: 'pending',
+    ts: Date.now()
+  };
+  setLoading(true);
+  firebase.database().ref('orders').push(order).then(() => {
+    setLoading(false);
+    sendWhatsApp(order, '🧹 Housekeeping Request');
+    document.getElementById('successTitle').textContent = 'Request Sent!';
+    document.getElementById('successMsg').textContent = `Thanks, ${order.name}! Your ${name} request has been sent.`;
+    document.getElementById('successOverlay').classList.add('show');
+  });
+}
+
+// ── CART / ORDER ──
+function renderCart() {
+  const list = document.getElementById('cartList');
+  const empty = document.getElementById('cartEmpty');
+  const btn = document.getElementById('submitBtn');
+  if (!cart.length) { list.innerHTML=''; empty.style.display='block'; btn.disabled=true; return; }
+  empty.style.display='none'; btn.disabled=false;
+  list.innerHTML = cart.map((item,i) => `
+    <div class="order-item">
+      <div>
+        <div class="order-item-name">${item.emoji} ${item.name}</div>
+        ${item.customizations.length?`<div class="order-item-details">${item.customizations.join(' · ')}</div>`:''}
+      </div>
+      <button class="remove-btn" onclick="removeFromCart(${i})">✕</button>
+    </div>`).join('');
+}
+function removeFromCart(i) { cart.splice(i,1); updateCartBadge(); renderCart(); }
+
+function submitOrder() {
+  const name = document.getElementById('customerName').value.trim();
+  if (!name) { showToast('Please enter your name!'); document.getElementById('customerName').focus(); return; }
+  if (!cart.length) { showToast('Your cart is empty!'); return; }
+  const order = {
+    name,
+    type: 'drinks',
+    items: cart.map(i=>({ name:i.name, emoji:i.emoji, customizations:i.customizations })),
+    time: new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', hour12:true }),
+    status: 'pending',
+    ts: Date.now()
+  };
+  setLoading(true);
+  firebase.database().ref('orders').push(order).then(() => {
+    setLoading(false);
+    const sent = sendWhatsApp(order, '🧾 New Drink Order');
+    cart=[]; updateCartBadge();
+    document.getElementById('successTitle').textContent = 'Order Placed!';
+    document.getElementById('successMsg').textContent = sent
+      ? `Thanks, ${name}! WhatsApp is opening — just tap Send!`
+      : `Thanks, ${name}! Check the Queue tab to track your order.`;
+    document.getElementById('successOverlay').classList.add('show');
+  }).catch(()=>{ setLoading(false); showToast('Error. Try again.'); });
+}
+
+// ── WHATSAPP — FIXED ──
+function sendWhatsApp(order, title) {
+  const waNumber = document.getElementById('waNumber')?.value.trim() || '';
+  if (!waNumber) return false;
+
+  const lines = [
+    title + '\n',
+    '👤 *Name:* ' + order.name,
+    '🕐 *Time:* ' + order.time,
+    ''
+  ];
+  (order.items||[]).forEach((item, i) => {
+    lines.push((i+1) + '. ' + item.emoji + ' *' + item.name + '*');
+    (item.customizations||[]).forEach(c => lines.push('    • ' + c));
+  });
+  lines.push('');
+  lines.push('_Sent via Buffet App_ ☕');
+
+  const cleanNumber = waNumber.replace(/[^0-9]/g, '');
+  const msg = lines.join('\n');
+  const encoded = encodeURIComponent(msg);
+  const url = `https://api.whatsapp.com/send?phone=${cleanNumber}&text=${encoded}`;
+  window.open(url, '_blank');
+  return true;
+}
+
+function closeSuccess() {
+  document.getElementById('successOverlay').classList.remove('show');
+  showScreen('queue');
+}
+
+// ── QUEUE (user view) ──
+function renderQueue() {
+  const el = document.getElementById('queueList');
+  const list = Object.entries(orders).sort((a,b) => (b[1].ts||0)-(a[1].ts||0));
+  if (!list.length) { el.innerHTML=`<div class="empty-state"><div class="icon">⏳</div>No requests yet.</div>`; return; }
+  el.innerHTML = list.map(([key, o]) => `
+    <div class="queue-item">
+      <div class="queue-header">
+        <span class="queue-name">${o.type==='housekeeping'?'🧹 ':''} ${o.name}</span>
+        <span class="queue-time">${o.time}</span>
+      </div>
+      <div class="queue-drinks">${(o.items||[]).map(i=>`${i.emoji} ${i.name}${i.customizations?.length?' — '+i.customizations.join(', '):''}`).join('<br>')}</div>
+      <div class="queue-footer">
+        <span class="status-badge ${o.status==='pending'&&o.type==='housekeeping'?'hk':o.status}">${statusLabel(o.status, o.type)}</span>
+        <button class="queue-remove-btn" onclick="removeOrder('${key}')">✕ Remove</button>
+      </div>
+    </div>`).join('');
+}
+
+function statusLabel(s, type) {
+  if (s==='pending' && type==='housekeeping') return '🧹 Requested';
+  return { pending:'⏳ Pending', ready:'✅ Ready to pick up!', done:'✔ Done' }[s] || s;
+}
+
+function removeOrder(key) {
+  if (!confirm('Remove this request from the queue?')) return;
+  firebase.database().ref('orders/' + key).remove();
+}
+
+// ── ADMIN ──
+function renderAdminDrinks() {
+  const el = document.getElementById('adminDrinkList');
+  const list = Object.entries(drinks);
+  if (!list.length) { el.innerHTML=`<div class="empty-state" style="padding:20px 0">No drinks yet.</div>`; return; }
+  el.innerHTML = list.map(([key, d]) => `
+    <div class="admin-drink-item">
+      <div class="admin-drink-left">
+        <span style="font-size:24px">${d.emoji||'☕'}</span>
+        <div><div class="admin-drink-name">${d.name}</div><div class="admin-drink-opts">${d.options?.length?d.options.map(o=>o.label).join(', '):'No options'}</div></div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="delete-btn" style="background:var(--accent-light);color:var(--accent)" onclick="openEditModal('${key}')">✏️</button>
+        <button class="delete-btn" onclick="deleteDrink('${key}')">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+function renderAdminQueue() {
+  const el = document.getElementById('adminQueueList');
+  const list = Object.entries(orders).sort((a,b)=>(b[1].ts||0)-(a[1].ts||0));
+  if (!list.length) { el.innerHTML=`<div class="empty-state" style="padding:20px 0">No requests yet.</div>`; return; }
+  el.innerHTML = list.map(([key, o]) => `
+    <div class="queue-admin-item">
+      <div class="queue-admin-header">
+        <div>
+          <span class="queue-admin-name">${o.type==='housekeeping'?'🧹 ':''}${o.name}</span>
+          <span style="color:var(--ink3);font-size:12px;margin-left:8px">${o.time}</span>
+        </div>
+        <select class="queue-status-select" onchange="updateStatus('${key}',this.value)">
+          <option value="pending"${o.status==='pending'?' selected':''}>⏳ Pending</option>
+          <option value="ready"${o.status==='ready'?' selected':''}>✅ Ready</option>
+          <option value="done"${o.status==='done'?' selected':''}>✔ Done</option>
+        </select>
+      </div>
+      <div class="queue-admin-drinks">${(o.items||[]).map(it=>`${it.emoji} ${it.name}${it.customizations?.length?' — '+it.customizations.join(', '):''}`).join('<br>')}</div>
+      <button class="queue-admin-remove" onclick="removeOrder('${key}')">✕ Remove from queue</button>
+    </div>`).join('');
+}
+
+function updateStatus(key, status) {
+  firebase.database().ref('orders/' + key).update({ status }).then(() => showToast('Status updated!'));
+}
+
+// ── CUSTOM OPTIONS ──
+function addCustomOption() { customOptions.push({label:'',type:'stepper',choices:'',unit:''}); renderCustomBuilder(); }
+function removeCustomOption(i) { customOptions.splice(i,1); renderCustomBuilder(); }
+function renderCustomBuilder() {
+  document.getElementById('customBuilder').innerHTML = customOptions.map((opt,i)=>`
+    <div class="custom-option-row">
+      <input type="text" placeholder="Label" value="${opt.label}" oninput="customOptions[${i}].label=this.value"/>
+      <select onchange="customOptions[${i}].type=this.value;renderCustomBuilder()">
+        <option value="stepper"${opt.type==='stepper'?' selected':''}>Stepper</option>
+        <option value="chips"${opt.type==='chips'?' selected':''}>Chips</option>
+      </select>
+      ${opt.type==='stepper'?`<input type="text" placeholder="Unit" value="${opt.unit}" style="width:60px" oninput="customOptions[${i}].unit=this.value"/>`:''}
+      ${opt.type==='chips'?`<input type="text" placeholder="Choices (comma sep)" value="${opt.choices}" style="flex:2" oninput="customOptions[${i}].choices=this.value"/>`:''}
+      <button class="remove-custom-btn" onclick="removeCustomOption(${i})">✕</button>
+    </div>`).join('');
+}
+
+function saveDrink() {
+  const name = document.getElementById('newDrinkName').value.trim();
+  const emoji = document.getElementById('newDrinkEmoji').value.trim()||'☕';
+  const desc = document.getElementById('newDrinkDesc').value.trim();
+  if (!name) { showToast('Please enter a drink name!'); return; }
+  const options = customOptions.map(opt=>{
+    if (opt.type==='stepper') return {label:opt.label||'Option',type:'stepper',unit:opt.unit||'spoon(s)'};
+    if (opt.type==='chips') return {label:opt.label||'Option',type:'chips',choices:opt.choices.split(',').map(c=>c.trim()).filter(Boolean)};
+  }).filter(Boolean);
+  setLoading(true);
+  firebase.database().ref('drinks').push({name,emoji,desc,options}).then(()=>{
+    setLoading(false);
+    document.getElementById('newDrinkName').value='';
+    document.getElementById('newDrinkDesc').value='';
+    document.getElementById('newDrinkEmoji').value='';
+    customOptions=[]; renderCustomBuilder();
+    showToast(`${emoji} ${name} added!`);
+  });
+}
+
+function deleteDrink(key) {
+  if (!confirm('Remove this drink?')) return;
+  firebase.database().ref('drinks/' + key).remove().then(() => showToast('Drink removed.'));
+}
+
+// ── EDIT MODAL ──
+function openEditModal(key) {
+  editingKey = key;
+  const d = drinks[key];
+  document.getElementById('editDrinkName').value = d.name;
+  document.getElementById('editDrinkDesc').value = d.desc||'';
+  document.getElementById('editDrinkEmoji').value = d.emoji||'';
+  editCustomOptions = (d.options||[]).map(opt=>{
+    if (opt.type==='stepper') return {label:opt.label,type:'stepper',unit:opt.unit||''};
+    if (opt.type==='chips') return {label:opt.label,type:'chips',choices:(opt.choices||[]).join(', ')};
+    return opt;
+  });
+  renderEditCustomBuilder();
+  document.getElementById('editModalBackdrop').classList.add('show');
+}
+function closeEditModal(e) {
+  if (e && e.target !== document.getElementById('editModalBackdrop')) return;
+  document.getElementById('editModalBackdrop').classList.remove('show');
+  editingKey = null;
+}
+function addEditCustomOption() { editCustomOptions.push({label:'',type:'stepper',choices:'',unit:''}); renderEditCustomBuilder(); }
+function removeEditCustomOption(i) { editCustomOptions.splice(i,1); renderEditCustomBuilder(); }
+function renderEditCustomBuilder() {
+  document.getElementById('editCustomBuilder').innerHTML = editCustomOptions.map((opt,i)=>`
+    <div class="custom-option-row">
+      <input type="text" placeholder="Label" value="${opt.label}" oninput="editCustomOptions[${i}].label=this.value"/>
+      <select onchange="editCustomOptions[${i}].type=this.value;renderEditCustomBuilder()">
+        <option value="stepper"${opt.type==='stepper'?' selected':''}>Stepper</option>
+        <option value="chips"${opt.type==='chips'?' selected':''}>Chips</option>
+      </select>
+      ${opt.type==='stepper'?`<input type="text" placeholder="Unit" value="${opt.unit}" style="width:60px" oninput="editCustomOptions[${i}].unit=this.value"/>`:''}
+      ${opt.type==='chips'?`<input type="text" placeholder="Choices (comma sep)" value="${opt.choices}" style="flex:2" oninput="editCustomOptions[${i}].choices=this.value"/>`:''}
+      <button class="remove-custom-btn" onclick="removeEditCustomOption(${i})">✕</button>
+    </div>`).join('');
+}
+function saveEditDrink() {
+  if (!editingKey) return;
+  const name = document.getElementById('editDrinkName').value.trim();
+  const emoji = document.getElementById('editDrinkEmoji').value.trim()||'☕';
+  const desc = document.getElementById('editDrinkDesc').value.trim();
+  if (!name) { showToast('Please enter a drink name!'); return; }
+  const options = editCustomOptions.map(opt=>{
+    if (opt.type==='stepper') return {label:opt.label||'Option',type:'stepper',unit:opt.unit||'spoon(s)'};
+    if (opt.type==='chips') return {label:opt.label||'Option',type:'chips',choices:opt.choices.split(',').map(c=>c.trim()).filter(Boolean)};
+  }).filter(Boolean);
+  setLoading(true);
+  firebase.database().ref('drinks/' + editingKey).set({name,emoji,desc,options}).then(()=>{
+    setLoading(false);
+    document.getElementById('editModalBackdrop').classList.remove('show');
+    editingKey=null;
+    showToast(`${emoji} ${name} updated!`);
+  });
+}
+
+// ── WA NUMBER ──
+function getWANumber() { return document.getElementById('waNumber')?.value.trim()||''; }
+function saveWANumber() {
+  const val = document.getElementById('waNumber')?.value.trim() || '';
+  firebase.database().ref('settings/waNumber').set(val);
+}
+
+// ── UTILS ──
+function setLoading(on) { document.getElementById('loadingBar').style.display = on?'block':'none'; }
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+renderHousekeeping();
+</script>
+</body>
+</html>
